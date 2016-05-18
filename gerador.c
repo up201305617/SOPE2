@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <semaphore.h>
 
@@ -19,7 +20,7 @@
 #define PARQUE_CHEIO 1
 #define PARQUE_ENCERROU 2
 
-int tps = sysconf(_SC_CLK_TCK);	//ticks per second // tps = 100
+//int tps = sysconf(_SC_CLK_TCK);	//ticks per second // tps = 100
 int id_viatura=0;
 sem_t * sem;
 
@@ -173,6 +174,7 @@ int main (int int argc, char* argv[])
 
 	srand(time(NULL));
 	double elapsedTime = 0;
+	clock_t start = clock(), curr_time;
 
 	while(elapsedTime < t_geracao)
 	{
@@ -225,6 +227,9 @@ int main (int int argc, char* argv[])
 		    exit(3);
 		}
 		pthread_detach(tid);
+		
+		elapsedTime = (curr_time - start) / (double) CLOCKS_PER_SEC;
+		
 	}
 	pthread_exit(NULL);
 }
