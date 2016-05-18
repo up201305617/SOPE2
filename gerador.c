@@ -4,30 +4,150 @@
 #include <errno.h>
 #include <time.h>
 #include <pthread.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <limits.h>
+#include <semaphore.h>
 
 #define FIFOPN "/tmp/fifoN"
 #define FIFOPS "/tmp/fifoS"
 #define FIFOPE "/tmp/fifoE"
 #define FIFOPO "/tmp/fifoO"
+#define MAX_LENGHT 5000
+#define SAIU_PARQUE 0
+#define PARQUE_CHEIO 1
+#define PARQUE_ENCERROU 2
+
+int id_viatura=0;
+sem_t * sem;
 
 struct
 {
-	char direccao;
-	int id;
+	char direccao; //accesso do parque para onde se vai dirigir
+	int tempo; //quanto tempo irá estar estacionada
+	int id; //número identificador da viatura (único)
 } Viatura;
 
 void * tviatura(void * arg)
 {
-	pthread_t self = pthread_self();
-
 	struct Viatura v = *(struct Viatura *) arg;
-
-	if(pthread_detach(self)!=0)
+	//criar fifo privado de nome único - usar o id da viatura
+	char private_fifo[MAX_LENGHT];
+	sprintf(private_fifo, "/tmp/viatura%d", v->id);
+	if(mkfifo(private_fifo,0660)!=0)
 	{
-		printf("Error in thread %d",(int)self);
-		exit(1);
+		perror(private_fifo);
+		free(v);
+		exit(2);
+	}
+	//criar semaforo
+	if((sem = sem_open("/semaphore",O_CREAT,0600,0)) == SEM_FAILED)
+	{
+		perror("WRITER failure in sem_open()");
+		unlink(private_fifo);
+	    free(v);
+	    return NULL;
+	}
+	sem_wait(sem);
+	//criar fifo escrita
+	int write_to_fifo;
+	switch (v->direccao)
+	{
+	     case 'N':
+	    	 if((write_to_fifo = open(FIFOPN, O_WRONLY)) == -1)
+	    	 {
+	    		 perror(private_fifo);
+	    		 unlink(private_fifo);
+	    		 close(FIFOPN);
+	    		 sem_post(sem);
+	    		 free(v);
+	    		 return NULL;
+	    	 }
+	    	 break;
+		 case 'S':
+			 if((write_to_fifo = open(FIFOPS, O_WRONLY)) == -1)
+			 {
+				 perror(private_fifo);
+				 unlink(private_fifo);
+				 close(FIFOPS);
+				 sem_post(sem);
+				 free(v);
+				 return NULL;
+			 }
+	         break;
+	     case 'E':
+	    	 if((write_to_fifo = open(FIFOPE, O_WRONLY)) == -1)
+			 {
+				 perror(private_fifo);
+				 unlink(private_fifo);
+				 close(FIFOPE);
+				 sem_post(sem);
+				 free(v);
+				 return NULL;
+			 }
+	         break;
+	     case 'O':
+	    	 if((write_to_fifo = open(FIFOPO, O_WRONLY)) == -1)
+			 {
+				 perror(private_fifo);
+				 unlink(private_fifo);
+				 close(FIFOPO);
+				 sem_post(sem);
+				 free(v);
+				 return NULL;
+			 }
+	         break;
+	}
+	//escrever para o fifo
+	if( write( write_to_fifo, v, sizeof(Viatura) ) == -1 )
+	{
+		printf("WRITE ERRO\n");
+	    free(v);
+	    unlink(private_fifo);
+	    close(write_to_fifo);
+	    sem_post(sem);
+	    exit(3);
+	}
+	close(write_to_fifo);
+	sem_post(sem);
+	//abrir fifo de leitura
+	int read_from_fifo;
+	if((read_from_fifo=open(private_fifo,O_RDONLY))==-1)
+	{
+		perror(private_fifo);
+		free(v);
+		unlink(private_fifo);
+		close(read_from_fifo);
+		exit(4);
+	}
+	//ler do fifo
+	char info_from_park;
+	if(read(read_from_fifo,&info_from_park,sizeof(char))==-1)
+	{
+		printf("READ ERRO\n");
+		free(v);
+		unlink(private_fifo);
+		close(read_from_fifo);
+		exit(4);
 	}
 
+	if(info_from_park==SAIU_PARQUE)
+	{
+		printf("viatura saiu do parque\n");
+	}
+	if(info_from_park==PARQUE_CHEIO)
+	{
+		printf("parque cheio\n");
+	}
+	if(info_from_park==PARQUE_ENCERROU)
+	{
+		printf("parque fechou\n");
+	}
+
+	free(v);
+	unlink(private_fifo);
+	close(read_from_fifo);
 	return NULL;
 }
 
@@ -49,12 +169,36 @@ int main (int int argc, char* argv[])
 	}
 
 	srand(time(NULL));
-	int elapsedTime;
-
+	double elapsedTime;
 
 	while(elapsedTime < t_geracao)
 	{
-		int random = rand % 10;
+		Viatura* v = (Viatura*)malloc(sizeof(Viatura));
+
+		int random_access = rand() % 4;
+		//criar a direcção
+		if(random_access==0)
+		{
+			v->direccao='N';
+		}
+		else if(random_access==1)
+		{
+			v->direccao='S';
+		}
+		else if(random_access==2)
+		{
+			v->direccao='E';
+		}
+		else
+		{
+			v->direccao='O';
+		}
+		//criar o identificador único
+		v->id=id_viatura++;
+		//gerar o tempo de estacionamento
+		v->tempo=(rand()%10 + 1 )* u_relogio;
+
+		int random = rand() % 10;
 
 		if(random<5) //50%
 		{
@@ -68,5 +212,14 @@ int main (int int argc, char* argv[])
 		{
 
 		}
+		//criar thread para a viatura
+		pthread_t tid;
+		if(pthread_create(&tid, NULL , tviatura , v))
+		{
+			printf("Error Creating Thread!\n");
+		    exit(3);
+		}
+		pthread_detach(tid);
 	}
+	pthread_exit(NULL);
 }
