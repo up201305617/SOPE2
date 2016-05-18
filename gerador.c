@@ -19,6 +19,7 @@
 #define PARQUE_CHEIO 1
 #define PARQUE_ENCERROU 2
 
+int tps = sysconf(_SC_CLK_TCK);	//ticks per second // tps = 100
 int id_viatura=0;
 sem_t * sem;
 
@@ -162,14 +163,16 @@ int main (int int argc, char* argv[])
 	double t_geracao = (double) atoi(argv[1]);
 	int u_relogio = atoi(argv[2]);
 
-	if(t_geracao<=0 || u_relogio<=0)
+	if(t_geracao <= 0 || u_relogio <= 0)
 	{
 		fprintf(stderr, "Illegal arguments");
 		exit(2);
 	}
+	
+	t_geracao *= 1000;	//de forma a representar milisegundos
 
 	srand(time(NULL));
-	double elapsedTime;
+	double elapsedTime = 0;
 
 	while(elapsedTime < t_geracao)
 	{
@@ -200,18 +203,20 @@ int main (int int argc, char* argv[])
 
 		int random = rand() % 10;
 
-		if(random<5) //50%
+		if(random < 2) //20%
 		{
-
+			//esperar durante duas unidades de tempo
+			usleep(1000 * 10 * 2 * u_relogio);		// * 1000 porque usleep trabalha com microsegundos
+			elapsedTime += 2 * u_relogio;
 		}
-		else if(random<8) //30%
+		else if(random < 5) //30%
 		{
-
+			//esperar durante uma unidade de tempo
+			usleep(1000 * 10 * u_relogio);
+			elapsedTime += u_relogio;
 		}
-		else //20%
-		{
+		//não é necessária uma condição pois acção a realizar é nula 
 
-		}
 		//criar thread para a viatura
 		pthread_t tid;
 		if(pthread_create(&tid, NULL , tviatura , v))
