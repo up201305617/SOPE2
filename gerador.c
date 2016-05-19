@@ -10,6 +10,7 @@
 #include <limits.h>
 #include <semaphore.h>
 #include <fcntl.h>
+#include "structs.h"
 
 #define FIFOPN "/tmp/fifoN"
 #define FIFOPS "/tmp/fifoS"
@@ -23,13 +24,6 @@
 
 int id_viatura=0;
 sem_t * sem;
-
-typedef struct
-{
-	char direccao; //accesso do parque para onde se vai dirigir
-	int tempo; //quanto tempo irá estar estacionada
-	int id; //número identificador da viatura (único)
-} Viatura;
 
 void mysleep(clock_t dur){
     clock_t start, curr_time;
@@ -56,20 +50,24 @@ void * tviatura(void * arg)
 	}
 	//criar semaforo
 	if((sem = sem_open("/semaphore",O_CREAT,0600,0)) == SEM_FAILED)
-	{
-		perror("WRITER failure in sem_open()");
+	{printf("aaaa--------%d\n", v->id);
+		perror("WRITER failure in sem_open()");printf("bbbb--------%d\n", v->id);
 		unlink(private_fifo);
 	    free(v);
-	    return NULL;
-	}
+	    return NULL;;
+	}printf("ffff--------%d\n", v->id);
 	sem_wait(sem);
+	printf("2--------%d\n", v->id);
 	//criar fifo escrita
 	int write_to_fifo;
 	switch (v->direccao)
 	{
 	     case 'N':
-	    	 if((write_to_fifo = open(FIFOPN, O_WRONLY)) == -1)
+			write_to_fifo = open(FIFOPN, O_WRONLY);
+			printf("2NNNNN--------%d\n", v->id);
+	    	 if(write_to_fifo == -1)
 	    	 {
+				 printf("fifo no go--------%d\n", v->id);
 	    		 perror(private_fifo);
 	    		 unlink(private_fifo);
 	    		 close(write_to_fifo);
@@ -79,8 +77,11 @@ void * tviatura(void * arg)
 	    	 }
 	    	 break;
 		 case 'S':
-			 if((write_to_fifo = open(FIFOPS, O_WRONLY)) == -1)
+			write_to_fifo = open(FIFOPS, O_WRONLY);
+			printf("2SSSSS--------%d\n", v->id);
+			 if(write_to_fifo == -1)
 			 {
+				 printf("fifo no go--------%d\n", v->id);
 				 perror(private_fifo);
 				 unlink(private_fifo);
 				 close(write_to_fifo);
@@ -90,8 +91,11 @@ void * tviatura(void * arg)
 			 }
 	         break;
 	     case 'E':
-	    	 if((write_to_fifo = open(FIFOPE, O_WRONLY)) == -1)
+			write_to_fifo = open(FIFOPE, O_WRONLY);
+			printf("2EEEEEE--------%d\n", v->id);
+	    	 if(write_to_fifo == -1)
 			 {
+				 printf("fifo no go--------%d\n", v->id);
 				 perror(private_fifo);
 				 unlink(private_fifo);
 				 close(write_to_fifo);
@@ -101,8 +105,11 @@ void * tviatura(void * arg)
 			 }
 	         break;
 	     case 'O':
-	    	 if((write_to_fifo = open(FIFOPO, O_WRONLY)) == -1)
+			write_to_fifo = open(FIFOPO, O_WRONLY);
+			printf("2OOOOO--------%d\n", v->id);
+	    	 if(write_to_fifo == -1)
 			 {
+				 printf("fifo no go--------%d\n", v->id);
 				 perror(private_fifo);
 				 unlink(private_fifo);
 				 close(write_to_fifo);
@@ -111,7 +118,7 @@ void * tviatura(void * arg)
 				 return NULL;
 			 }
 	         break;
-	}
+	}printf("3---------\n");
 	//escrever para o fifo
 	if( write( write_to_fifo, v, sizeof(Viatura) ) == -1 )
 	{
@@ -143,7 +150,7 @@ void * tviatura(void * arg)
 		unlink(private_fifo);
 		close(read_from_fifo);
 		exit(4);
-	}
+	}printf("4--------\n");
 
 	if(info_from_park==SAIU_PARQUE)
 	{
@@ -156,7 +163,7 @@ void * tviatura(void * arg)
 	if(info_from_park==PARQUE_ENCERROU)
 	{
 		printf("parque fechou\n");
-	}
+	}printf("5----------\n");
 
 	free(v);
 	unlink(private_fifo);
@@ -175,7 +182,7 @@ int main (int argc, char* argv[])
 	double t_geracao = (double) atoi(argv[1]);
 	int u_relogio = atoi(argv[2]);
 
-	if(t_geracao<=0 || u_relogio<=0)
+	if(t_geracao <= 0 || u_relogio <= 0)
 	{
 		fprintf(stderr, "Illegal arguments");
 		exit(2);
@@ -245,5 +252,4 @@ int main (int argc, char* argv[])
 	}
 	
 	pthread_exit(NULL);
-	return 0;
 }
