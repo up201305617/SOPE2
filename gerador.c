@@ -7,9 +7,9 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <limits.h>
 #include <semaphore.h>
+#include <fcntl.h>
 
 #define FIFOPN "/tmp/fifoN"
 #define FIFOPS "/tmp/fifoS"
@@ -20,11 +20,10 @@
 #define PARQUE_CHEIO 1
 #define PARQUE_ENCERROU 2
 
-//int tps = sysconf(_SC_CLK_TCK);	//ticks per second // tps = 100
 int id_viatura=0;
 sem_t * sem;
 
-struct
+typedef struct
 {
 	char direccao; //accesso do parque para onde se vai dirigir
 	int tempo; //quanto tempo irá estar estacionada
@@ -33,7 +32,7 @@ struct
 
 void * tviatura(void * arg)
 {
-	struct Viatura v = *(struct Viatura *) arg;
+	Viatura *v = (Viatura *) (arg);
 	//criar fifo privado de nome único - usar o id da viatura
 	char private_fifo[MAX_LENGHT];
 	sprintf(private_fifo, "/tmp/viatura%d", v->id);
@@ -61,7 +60,7 @@ void * tviatura(void * arg)
 	    	 {
 	    		 perror(private_fifo);
 	    		 unlink(private_fifo);
-	    		 close(FIFOPN);
+	    		 close(write_to_fifo);
 	    		 sem_post(sem);
 	    		 free(v);
 	    		 return NULL;
@@ -72,7 +71,7 @@ void * tviatura(void * arg)
 			 {
 				 perror(private_fifo);
 				 unlink(private_fifo);
-				 close(FIFOPS);
+				 close(write_to_fifo);
 				 sem_post(sem);
 				 free(v);
 				 return NULL;
@@ -83,7 +82,7 @@ void * tviatura(void * arg)
 			 {
 				 perror(private_fifo);
 				 unlink(private_fifo);
-				 close(FIFOPE);
+				 close(write_to_fifo);
 				 sem_post(sem);
 				 free(v);
 				 return NULL;
@@ -94,7 +93,7 @@ void * tviatura(void * arg)
 			 {
 				 perror(private_fifo);
 				 unlink(private_fifo);
-				 close(FIFOPO);
+				 close(write_to_fifo);
 				 sem_post(sem);
 				 free(v);
 				 return NULL;
@@ -153,7 +152,7 @@ void * tviatura(void * arg)
 	return NULL;
 }
 
-int main (int int argc, char* argv[])
+int main (int argc, char* argv[])
 {
 	if(argc != 3)
 	{
@@ -164,17 +163,15 @@ int main (int int argc, char* argv[])
 	double t_geracao = (double) atoi(argv[1]);
 	int u_relogio = atoi(argv[2]);
 
-	if(t_geracao <= 0 || u_relogio <= 0)
+	if(t_geracao<=0 || u_relogio<=0)
 	{
 		fprintf(stderr, "Illegal arguments");
 		exit(2);
 	}
 	
-	t_geracao *= 1000;	//de forma a representar milisegundos
-
-	srand(time(NULL));
-	double elapsedTime = 0;
 	clock_t start = clock(), curr_time;
+	srand(time(NULL));
+	double elapsedTime=0;
 
 	while(elapsedTime < t_geracao)
 	{
@@ -205,7 +202,7 @@ int main (int int argc, char* argv[])
 
 		int random = rand() % 10;
 
-		if(random < 2) //20%
+		iif(random < 2) //20%
 		{
 			//esperar durante duas unidades de tempo
 			usleep(1000 * 10 * 2 * u_relogio);		// * 1000 porque usleep trabalha com microsegundos
@@ -217,8 +214,9 @@ int main (int int argc, char* argv[])
 			usleep(1000 * 10 * u_relogio);
 			elapsedTime += u_relogio;
 		}
-		//não é necessária uma condição pois acção a realizar é nula 
-
+		//não é necessária uma condição pois acção a realizar é nula
+		
+		
 		//criar thread para a viatura
 		pthread_t tid;
 		if(pthread_create(&tid, NULL , tviatura , v))
@@ -228,8 +226,9 @@ int main (int int argc, char* argv[])
 		}
 		pthread_detach(tid);
 		
-		elapsedTime = (curr_time - start) / (double) CLOCKS_PER_SEC;
-		
+		curr_time = clock();
+		elapsedTime = (curr_time - start)/ (double) CLOCKS_PER_SEC;
 	}
 	pthread_exit(NULL);
+	return 0;
 }
