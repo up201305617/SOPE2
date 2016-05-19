@@ -19,6 +19,7 @@
 #define SAIU_PARQUE 0
 #define PARQUE_CHEIO 1
 #define PARQUE_ENCERROU 2
+#define TPS sysconf(_SC_CLK_TCK)	//ticks per second
 
 int id_viatura=0;
 sem_t * sem;
@@ -30,9 +31,20 @@ typedef struct
 	int id; //número identificador da viatura (único)
 } Viatura;
 
+void mysleep(clock_t dur){
+    clock_t start, curr_time;
+    
+    start = curr_time = clock();
+
+    while ((curr_time - start) < (dur * (1000000/TPS))){
+		curr_time = clock();
+	}
+}
+
 void * tviatura(void * arg)
-{
+{	
 	Viatura *v = (Viatura *) (arg);
+	printf("thread viatura %d\n", v->id);
 	//criar fifo privado de nome único - usar o id da viatura
 	char private_fifo[MAX_LENGHT];
 	sprintf(private_fifo, "/tmp/viatura%d", v->id);
@@ -169,14 +181,14 @@ int main (int argc, char* argv[])
 		exit(2);
 	}
 	
-	clock_t start = clock(), curr_time;
+	double elapsedTime = 0;
 	srand(time(NULL));
-	double elapsedTime=0;
+	clock_t start = clock(), curr_time;
 
 	while(elapsedTime < t_geracao)
 	{
 		Viatura* v = (Viatura*)malloc(sizeof(Viatura));
-
+		
 		int random_access = rand() % 4;
 		//criar a direcção
 		if(random_access==0)
@@ -195,30 +207,31 @@ int main (int argc, char* argv[])
 		{
 			v->direccao='O';
 		}
+		
 		//criar o identificador único
-		v->id=id_viatura++;
+		v->id=id_viatura;
+		id_viatura++;
 		//gerar o tempo de estacionamento
 		v->tempo=(rand()%10 + 1 )* u_relogio;
-
+		
 		int random = rand() % 10;
-
-		iif(random < 2) //20%
+		
+		if(random < 2) //20%
 		{
 			//esperar durante duas unidades de tempo
-			usleep(1000 * 10 * 2 * u_relogio);		// * 1000 porque usleep trabalha com microsegundos
-			elapsedTime += 2 * u_relogio;
+			mysleep(2 * u_relogio);
 		}
 		else if(random < 5) //30%
 		{
 			//esperar durante uma unidade de tempo
-			usleep(1000 * 10 * u_relogio);
-			elapsedTime += u_relogio;
+			mysleep(u_relogio);
 		}
 		//não é necessária uma condição pois acção a realizar é nula
 		
 		
 		//criar thread para a viatura
 		pthread_t tid;
+		
 		if(pthread_create(&tid, NULL , tviatura , v))
 		{
 			printf("Error Creating Thread!\n");
@@ -227,8 +240,10 @@ int main (int argc, char* argv[])
 		pthread_detach(tid);
 		
 		curr_time = clock();
-		elapsedTime = (curr_time - start)/ (double) CLOCKS_PER_SEC;
+		elapsedTime = (curr_time - start) / (double) CLOCKS_PER_SEC;
+		printf("time:%f\n", elapsedTime);	//time keeping doesn't seem to be correct
 	}
+	
 	pthread_exit(NULL);
 	return 0;
 }
