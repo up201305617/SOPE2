@@ -12,39 +12,107 @@
 #include <fcntl.h>
 #include "structs.h"
 
-#define CONTR_N_ID	0
-#define CONTR_S_ID	1
-#define CONTR_E_ID	2
-#define CONTR_O_ID	3
 
-#define FIFON	"/tmp/fifoN"
-#define FIFOS	"/tmp/fifoS"
-#define FIFOE	"/tmp/fifoE"
-#define FIFOO	"/tmp/fifoO"
+int f_places, fp;
 
 void * tarrumador(void * arg){
 	//arruma
+	Viatura *vehicle = (Viatura *) (arg);
+	int fd;
+	char info;
 	
-	//sleep(duration);
+	char private_fifo[MAX_LENGHT];
+	sprintf(private_fifo, "/tmp/viatura%d", vehicle->id);
+
+	if((fd = open(private_fifo, O_WRONLY)) == -1){
+		perror(private_fifo);
+		free(vehicle);
+		unlink(private_fifo);
+		close(fd);
+		exit(4);
+	}
 	
-	//manda embora
+	if (fp <= 0){
+		info = PARQUE_CHEIO;
+		if (write(fd, &info, sizeof(char) ) == -1 ){
+			perror(private_fifo);
+			free(vehicle);
+			unlink(private_fifo);
+			close(fd);
+			//sem_post(sem);
+			exit(3);
+		}
+	}
+	else {
+		info = ENTROU_PARQUE;
+		if (write(fd, &info, sizeof(char) ) == -1 ){
+			perror(private_fifo);
+			free(vehicle);
+			unlink(private_fifo);
+			close(fd);
+			//sem_post(sem);
+			exit(3);
+		}	
+		
+		fp--;
+		
+		mysleep(vehicle->tempo);
+		
+		info = SAIU_PARQUE;
+		if (write(fd, &info, sizeof(char) ) == -1 ){
+			perror(private_fifo);
+			free(vehicle);
+			unlink(private_fifo);
+			close(fd);
+			//sem_post(sem);
+			exit(3);
+		}
+		
+		fp++;
+	}
 	
 	return NULL;
 }
 
-void * tcontrollerN(void * arg){
-	int closed = 0;
-	Viatura * vehicle = (Viatura *) (arg);
-	int fd = open(FIFON, O_RDONLY);
+void * tcontroller(void * arg){
+	char * fifo_controller = (char *) arg;
+	int fd, closed = 0;
+	Viatura * vehicle = (Viatura*)malloc(sizeof(Viatura));
+	
+	if((fd = open(fifo_controller, O_RDONLY))==-1)
+	{
+		perror(fifo_controller);
+		//free(v);
+		unlink(fifo_controller);
+		close(fd);
+		exit(4);
+	}
+	
 	while (read(fd, &vehicle, sizeof(Viatura)) != 0){
 		if (vehicle->id == -1){
 			closed = 1;
 		}
-		else if (closed){
+		else if (closed){/*
 			//enviar para trás "fechado"
+			if( write( fd, v, sizeof(Viatura) ) == -1 ){
+				//printf("fechado\n");
+				free(v);
+				unlink(private_fifo);
+				close(private_fifo);
+				sem_post(sem);
+				exit(3);
+			}*/
 		}
 		else {
 			//criar thread arrumador e passar vehicle
+			
+			pthread_t tid;
+			
+			if(pthread_create(&tid, NULL , tarrumador , vehicle)){
+				printf("Error Creating Thread!\n");
+				exit(3);
+			}			
+			pthread_detach(tid);
 		}
 
 	}
@@ -52,65 +120,7 @@ void * tcontrollerN(void * arg){
 	return NULL;
 }
 
-void * tcontrollerS(void * arg){
-	int closed = 0;
-	Viatura * vehicle = (Viatura *) (arg);
-	int fd = open(FIFOS, O_RDONLY);
-	while (read(fd, &vehicle, sizeof(Viatura)) != 0){
-		if (vehicle->id == -1){
-			closed = 1;
-		}
-		else if (closed){
-			//enviar para trás "fechado"
-		}
-		else {
-			//criar thread arrumador e passar vehicle
-		}
 
-	}
-	close(fd);
-	return NULL;
-}
-
-void * tcontrollerE(void * arg){
-	int closed = 0;
-	Viatura * vehicle = (Viatura *) (arg);
-	int fd = open(FIFOE, O_RDONLY);
-	while (read(fd, &vehicle, sizeof(Viatura)) != 0){
-		if (vehicle->id == -1){
-			closed = 1;
-		}
-		else if (closed){
-			//enviar para trás "fechado"
-		}
-		else {
-			//criar thread arrumador e passar vehicle
-		}
-
-	}
-	close(fd);
-	return NULL;
-}
-
-void * tcontrollerO(void * arg){
-	int closed = 0;
-	Viatura * vehicle = (Viatura *) (arg);
-	int fd = open(FIFOO, O_RDONLY);
-	while (read(fd, &vehicle, sizeof(Viatura)) != 0){
-		if (vehicle->id == -1){
-			closed = 1;
-		}
-		else if (closed){
-			//enviar para trás "fechado"
-		}
-		else {
-			//criar thread arrumador e passar vehicle
-		}
-
-	}
-	close(fd);
-	return NULL;
-}
 
 int main(int argc, char ** argv){
 	
@@ -120,8 +130,8 @@ int main(int argc, char ** argv){
 		exit(1);
 	}
 	
-	int f_places = atoi(argv[1]);
-	//int fp = f_places;
+	f_places = atoi(argv[1]);
+	fp = f_places;
 	int duration = atoi(argv[2]);
 	
 	if(f_places <= 0 || duration <= 0)
@@ -136,21 +146,21 @@ int main(int argc, char ** argv){
 	int fdN, fdS, fdE, fdO;
 	pthread_t tid_n, tid_s, tid_e, tid_o;
 	
-	mkfifo(FIFON, 0600);
-	pthread_create(&tid_n, NULL, tcontrollerN, NULL);
-	fdN = open(FIFON, O_WRONLY);
+	mkfifo(FIFOPN, 0600);
+	pthread_create(&tid_n, NULL, tcontroller, FIFOPN);
+	fdN = open(FIFOPN, O_WRONLY);
 	
-	mkfifo(FIFOS, 0600);
-	pthread_create(&tid_s, NULL, tcontrollerS, NULL);
-	fdS = open(FIFOS, O_WRONLY);
+	mkfifo(FIFOPS, 0600);
+	pthread_create(&tid_s, NULL, tcontroller, FIFOPS);
+	fdS = open(FIFOPS, O_WRONLY);
 	
-	mkfifo(FIFOE, 0600);
-	pthread_create(&tid_e, NULL, tcontrollerE, NULL);
-	fdE = open(FIFOE, O_WRONLY);
+	mkfifo(FIFOPE, 0600);
+	pthread_create(&tid_e, NULL, tcontroller, FIFOPE);
+	fdE = open(FIFOPE, O_WRONLY);
 	
-	mkfifo(FIFOO, 0600);
-	pthread_create(&tid_o, NULL, tcontrollerO, NULL);
-	fdO = open(FIFOO, O_WRONLY);
+	mkfifo(FIFOPO, 0600);
+	pthread_create(&tid_o, NULL, tcontroller, FIFOPO);
+	fdO = open(FIFOPO, O_WRONLY);
 	
 	sleep(duration);
 	
@@ -159,19 +169,19 @@ int main(int argc, char ** argv){
 	
 	write(fdN, &vehicle_stop, sizeof(Viatura));
 	close(fdN);
-	unlink(FIFON);
+	unlink(FIFOPN);
 	
 	write(fdS, &vehicle_stop, sizeof(Viatura));
 	close(fdS);
-	unlink(FIFOS);
+	unlink(FIFOPS);
 	
 	write(fdE, &vehicle_stop, sizeof(Viatura));
 	close(fdE);
-	unlink(FIFOE);
+	unlink(FIFOPE);
 	
 	write(fdO, &vehicle_stop, sizeof(Viatura));
 	close(fdO);
-	unlink(FIFOO);
+	unlink(FIFOPO);
 	
 	pthread_exit(NULL);
 }
