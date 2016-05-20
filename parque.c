@@ -32,7 +32,7 @@ void * tarrumador(void * arg){
 		exit(4);
 	}
 	
-	if (fp <= 0){
+	if (fp <= 0){//free places
 		info = PARQUE_CHEIO;
 		if (write(fd, &info, sizeof(char) ) == -1 ){
 			perror(private_fifo);
@@ -75,47 +75,66 @@ void * tarrumador(void * arg){
 }
 
 void * tcontroller(void * arg){
-	char * fifo_controller = (char *) arg;
+	char * fifo_portao = (char *) arg;
 	int fd, closed = 0;
 	Viatura * vehicle = (Viatura*)malloc(sizeof(Viatura));
+	char info;
 	
-	if((fd = open(fifo_controller, O_RDONLY))==-1)
+	if((fd = open(fifo_portao, O_RDONLY))==-1)
 	{
-		perror(fifo_controller);
+		perror(fifo_portao);
 		//free(v);
-		unlink(fifo_controller);
+		unlink(fifo_portao);
 		close(fd);
 		exit(4);
 	}
 	
-	while (read(fd, &vehicle, sizeof(Viatura)) != 0){
+	while (read(fd, &vehicle, sizeof(Viatura)) != 0){//a partir daqui recebe comunicações dos geradores. se receber do portao é só para dizer que fechou
 		if (vehicle->id == -1){
 			closed = 1;
 		}
-		else if (closed){/*
+		else if (closed){
 			//enviar para trás "fechado"
-			if( write( fd, v, sizeof(Viatura) ) == -1 ){
-				//printf("fechado\n");
-				free(v);
+			int fd_gerador;
+			
+			char private_fifo[MAX_LENGHT];
+			sprintf(private_fifo, "/tmp/viatura%d", vehicle->id);
+			
+			if((fd_gerador = open(private_fifo, O_WRONLY)) == -1){
+				perror(private_fifo);
+				//free(vehicle);
 				unlink(private_fifo);
-				close(private_fifo);
-				sem_post(sem);
+				close(fd_gerador);
+				exit(4);
+			}
+			
+			info = PARQUE_ENCERROU;
+			if (write(fd_gerador, &info, sizeof(char) ) == -1 ){
+				perror(private_fifo);
+				//free(vehicle);
+				unlink(private_fifo);
+				close(fd_gerador);
+				//sem_post(sem);
 				exit(3);
-			}*/
+			}
+			printf("veiculo %d tentou entrar, parque cheio\n", vehicle->id);
+			
 		}
 		else {
-			//criar thread arrumador e passar vehicle
+			//criar thread arrumador e passar2016 vehicle
 			
 			pthread_t tid;
 			
 			if(pthread_create(&tid, NULL , tarrumador , vehicle)){
 				printf("Error Creating Thread!\n");
 				exit(3);
-			}			
+			}
+			printf("veiculo %d agora ao cargo do thread arrumador\n", vehicle->id);
 			pthread_detach(tid);
 		}
-
+		//unlink(private_fifo);
 	}
+	//unlink(fd_gerador);
 	close(fd);
 	return NULL;
 }
