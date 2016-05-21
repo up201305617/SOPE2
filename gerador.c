@@ -30,27 +30,32 @@ void * tviatura(void * arg)
 	}*/
 	mkfifo(private_fifo, 0600);
 	
-	
 	//criar semaforo
-	if((sem = sem_open("/semaphore",O_CREAT,0600,0)) == SEM_FAILED)
+	if((sem = sem_open("/semaphore", 0)) == SEM_FAILED)
 	{
 		perror("WRITER failure in sem_open()");
-		unlink(private_fifo);
-	    free(v);
-	    return NULL;
+		//unlink(private_fifo);
+	    //free(v);
+	    exit(3);
 	}
+	
+	//int * sem_val;
+	printf("00000000\n");
+	//sem_getvalue(sem, sem_val);printf("11111111\n");
+	//printf("sem: %d\n", *sem_val);
+	printf("before sem_wait in gerador\n");
 	sem_wait(sem);
-	printf("aaaaaaaaa\n");
+	printf("after sem_wait in gerador\n");
 	//criar fifo escrita
 	int write_to_fifo;
 
 	switch (v->direccao)
 	{
 	     case 'N':printf("bbbbbbbb\n");
-			write_to_fifo = open(FIFOPN, O_WRONLY);
+			write_to_fifo = open(FIFOPN, O_WRONLY);printf("bbbbbaaaaa\n");
 			
 	    	 if(write_to_fifo == -1)
-	    	 {
+	    	 {printf("ccccccccc\n");
 	    		 perror(private_fifo);
 	    		 unlink(private_fifo);
 	    		 close(write_to_fifo);
@@ -60,10 +65,10 @@ void * tviatura(void * arg)
 	    	 }
 	    	 break;
 		 case 'S':printf("bbbbbbbb\n");
-			write_to_fifo = open(FIFOPS, O_WRONLY);
+			write_to_fifo = open(FIFOPS, O_WRONLY);printf("bbbbbaaaaa\n");
 			
 			 if(write_to_fifo == -1)
-			 {
+			 {printf("ccccccccc\n");
 				 perror(private_fifo);
 				 unlink(private_fifo);
 				 close(write_to_fifo);
@@ -73,10 +78,10 @@ void * tviatura(void * arg)
 			 }
 	         break;
 	     case 'E':printf("bbbbbbbb\n");
-			write_to_fifo = open(FIFOPE, O_WRONLY);
+			write_to_fifo = open(FIFOPE, O_WRONLY);printf("bbbbbaaaaa\n");
 			
 	    	 if(write_to_fifo == -1)
-			 {
+			 {printf("ccccccccc\n");
 				 perror(private_fifo);
 				 unlink(private_fifo);
 				 close(write_to_fifo);
@@ -86,10 +91,10 @@ void * tviatura(void * arg)
 			 }
 	         break;
 	     case 'O':printf("bbbbbbbb\n");
-			write_to_fifo = open(FIFOPO, O_WRONLY);
+			write_to_fifo = open(FIFOPO, O_WRONLY);printf("bbbbbaaaaa\n");
 			
 	    	 if(write_to_fifo == -1)
-			 {
+			 {printf("ccccccccc\n");
 				 perror(private_fifo);
 				 unlink(private_fifo);
 				 close(write_to_fifo);
@@ -98,7 +103,7 @@ void * tviatura(void * arg)
 				 return NULL;
 			 }
 	         break;
-	}printf("ccccccccc\n");
+	}printf("dddddddd\n");
 	//escrever para o fifo
 	if( write( write_to_fifo, v, sizeof(Viatura) ) == -1 )
 	{
@@ -108,11 +113,11 @@ void * tviatura(void * arg)
 	    close(write_to_fifo);
 	    sem_post(sem);
 	    exit(3);
-	}
+	}printf("eeeeeeee\n");
 	close(write_to_fifo);
 	sem_post(sem);
 	
-	
+	printf("fffffffff\n");
 	//abrir fifo de leitura
 	int read_from_fifo;
 	if((read_from_fifo=open(private_fifo,O_RDONLY))==-1)
@@ -122,7 +127,7 @@ void * tviatura(void * arg)
 		unlink(private_fifo);
 		close(read_from_fifo);
 		exit(4);
-	}
+	}printf("gggggggggg\n");
 	//ler do fifo
 	char info_from_park;
 	if(read(read_from_fifo,&info_from_park,sizeof(char))==-1)
@@ -133,7 +138,7 @@ void * tviatura(void * arg)
 		close(read_from_fifo);
 		exit(4);
 	}
-
+	printf("info: %c", info_from_park);
 	if(info_from_park==SAIU_PARQUE)
 	{
 		printf("viatura saiu do parque\n");

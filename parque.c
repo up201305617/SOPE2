@@ -80,7 +80,7 @@ void * tcontroller(void * arg){
 	int fd, closed = 0;
 	Viatura * vehicle = (Viatura*)malloc(sizeof(Viatura));
 	char info;
-	
+	printf("aaaaaaaa\n");
 	if((fd = open(fifo_portao, O_RDONLY))==-1)
 	{
 		perror(fifo_portao);
@@ -88,7 +88,7 @@ void * tcontroller(void * arg){
 		unlink(fifo_portao);
 		close(fd);
 		exit(4);
-	}
+	}printf("bbbbbbbb\n");
 	
 	while (read(fd, &vehicle, sizeof(Viatura)) != 0){//a partir daqui recebe comunicações dos geradores. se receber do portao é só para dizer que fechou
 		if (vehicle->id == -1){
@@ -137,6 +137,7 @@ void * tcontroller(void * arg){
 	}
 	//unlink(fd_gerador);
 	close(fd);
+	unlink(fifo_portao);
 	return NULL;
 }
 
@@ -163,14 +164,15 @@ int main(int argc, char ** argv){
 	//double elapsedTime = 0;
 	//clock_t start = clock(), curr_time;
 	
+	sem_unlink("/semaphore");
 	//criar semaforo
-	if((sem = sem_open("/semaphore",O_CREAT,0600,0)) == SEM_FAILED)
+	if((sem = sem_open("/semaphore",O_CREAT,0600,1)) == SEM_FAILED)
 	{
 		perror("WRITER failure in sem_open()");
 		//unlink(private_fifo);
 	    //free(v);
 	    exit(3);
-	}
+	}printf("000000\n");
 	
 	int fdN, fdS, fdE, fdO;
 	pthread_t tid_n, tid_s, tid_e, tid_o;
@@ -191,30 +193,35 @@ int main(int argc, char ** argv){
 	pthread_create(&tid_o, NULL, tcontroller, FIFOPO);
 	fdO = open(FIFOPO, O_WRONLY);
 	
+	printf("sleeping\n");
 	sleep(duration);
 	
+	//sem_post(sem);
+	int * sem_val;
+	sem_getvalue(sem, sem_val);
+	printf("sem: %d\n", *sem_val);
+	printf("before sem_wait in parque\n");
 	sem_wait(sem);
+	printf("after sem_wait in parque\n");
 	
 	Viatura * vehicle_stop = (Viatura*)malloc(sizeof(Viatura));
 	vehicle_stop->id= -1;
 	
 	write(fdN, &vehicle_stop, sizeof(Viatura));
 	close(fdN);
-	unlink(FIFOPN);
 	
 	write(fdS, &vehicle_stop, sizeof(Viatura));
 	close(fdS);
-	unlink(FIFOPS);
 	
 	write(fdE, &vehicle_stop, sizeof(Viatura));
 	close(fdE);
-	unlink(FIFOPE);
 	
 	write(fdO, &vehicle_stop, sizeof(Viatura));
 	close(fdO);
-	unlink(FIFOPO);
 	
 	sem_post(sem);
+	sem_close(sem);
+	sem_unlink("/semaphore");
 	
 	printf("Parque esta agora fechado\n");
 	
