@@ -18,26 +18,27 @@ sem_t * sem;
 
 void * tarrumador(void * arg){
 	//arruma
-	Viatura *vehicle = (Viatura *) (arg);
+	Viatura vehicle = *(Viatura *) (arg);
 	int fd;
-	char info;
-	
+	int info;
+	printf("000000000\n");
 	char private_fifo[MAX_LENGHT];
-	sprintf(private_fifo, "/tmp/viatura%d", vehicle->id);
+	sprintf(private_fifo, "/tmp/viatura%d", vehicle.id);
 
 	if((fd = open(private_fifo, O_WRONLY)) == -1){
 		perror(private_fifo);
-		free(vehicle);
+		//free(&vehicle);
 		unlink(private_fifo);
 		close(fd);
 		exit(4);
-	}
+	}printf("111111111111\n");
 	
 	if (fp <= 0){//free places
+		printf("22222222222222\n");
 		info = PARQUE_CHEIO;
 		if (write(fd, &info, sizeof(char) ) == -1 ){
 			perror(private_fifo);
-			free(vehicle);
+			//free(&vehicle);
 			unlink(private_fifo);
 			close(fd);
 			//sem_post(sem);
@@ -45,96 +46,102 @@ void * tarrumador(void * arg){
 		}
 	}
 	else {
+		printf("33333333333333\n");
 		info = ENTROU_PARQUE;
 		if (write(fd, &info, sizeof(char) ) == -1 ){
 			perror(private_fifo);
-			free(vehicle);
+			//free(&vehicle);
 			unlink(private_fifo);
 			close(fd);
 			//sem_post(sem);
 			exit(3);
 		}	
-		
+		printf("34343434343434\n");
 		fp--;
-		
-		mysleep(vehicle->tempo);
-		
+		printf("vehicle.tempo = %d\n", vehicle.tempo);
+		mysleep(vehicle.tempo);
+		printf("353535353535335\n");
 		info = SAIU_PARQUE;
 		if (write(fd, &info, sizeof(char) ) == -1 ){
 			perror(private_fifo);
-			free(vehicle);
+			//free(&vehicle);
 			unlink(private_fifo);
 			close(fd);
 			//sem_post(sem);
 			exit(3);
 		}
-		
+		printf("363636363636\n");
 		fp++;
 	}
-	
+	printf("4444444444444\n");
 	return NULL;
 }
 
 void * tcontroller(void * arg){
 	char * fifo_portao = (char *) arg;
 	int fd, closed = 0;
-	Viatura * vehicle = (Viatura*)malloc(sizeof(Viatura));
+	Viatura vehicle;// = (Viatura*)malloc(sizeof(Viatura));
 	char info;
 	printf("aaaaaaaa\n");
 	if((fd = open(fifo_portao, O_RDONLY))==-1)
 	{
 		perror(fifo_portao);
-		//free(v);
+		//free(&v);
 		unlink(fifo_portao);
 		close(fd);
 		exit(4);
 	}printf("bbbbbbbb\n");
 	
 	while (read(fd, &vehicle, sizeof(Viatura)) != 0){//a partir daqui recebe comunicações dos geradores. se receber do portao é só para dizer que fechou
-		if (vehicle->id == -1){
+		printf("ccccccccc\n");
+		if (vehicle.id == -1){
+			printf("bbbbdddddddddddd\n");
 			closed = 1;
+			printf("ddddddddd\n");
 		}
 		else if (closed){
 			//enviar para trás "fechado"
+			printf("bbbbeeeeeeeeeee\n");
 			int fd_gerador;
-			
+			printf("eeeeeeeee\n");
 			char private_fifo[MAX_LENGHT];
-			sprintf(private_fifo, "/tmp/viatura%d", vehicle->id);
+			sprintf(private_fifo, "/tmp/viatura%d", vehicle.id);
 			
 			if((fd_gerador = open(private_fifo, O_WRONLY)) == -1){
 				perror(private_fifo);
-				//free(vehicle);
+				//free(&vehicle);
 				unlink(private_fifo);
 				close(fd_gerador);
 				exit(4);
-			}
+			}printf("fffffffff\n");
 			
 			info = PARQUE_ENCERROU;
 			if (write(fd_gerador, &info, sizeof(char) ) == -1 ){
 				perror(private_fifo);
-				//free(vehicle);
+				//free(&vehicle);
 				unlink(private_fifo);
 				close(fd_gerador);
 				//sem_post(sem);
 				exit(3);
 			}
-			printf("veiculo %d tentou entrar, parque cheio\n", vehicle->id);
+			printf("veiculo %d tentou entrar, parque cheio\n", vehicle.id);
 			
 		}
 		else {
 			//criar thread arrumador e passar2016 vehicle
-			
+			printf("gggggggggg\n");
 			pthread_t tid;
 			
-			if(pthread_create(&tid, NULL , tarrumador , vehicle)){
+			if(pthread_create(&tid, NULL , tarrumador , &vehicle)){
 				printf("Error Creating Thread!\n");
 				exit(3);
 			}
-			printf("veiculo %d agora ao cargo do thread arrumador\n", vehicle->id);
+			printf("veiculo %d agora ao cargo do thread arrumador\n", vehicle.id);
 			pthread_detach(tid);
 		}
+		printf("hhhhhhhhh\n");
 		//unlink(private_fifo);
-	}
+	}printf("yyyyyyyyy\n");
 	//unlink(fd_gerador);
 	close(fd);
 	unlink(fifo_portao);
@@ -170,7 +177,7 @@ int main(int argc, char ** argv){
 	{
 		perror("WRITER failure in sem_open()");
 		//unlink(private_fifo);
-	    //free(v);
+	    //free(&v);
 	    exit(3);
 	}printf("000000\n");
 	
@@ -197,15 +204,17 @@ int main(int argc, char ** argv){
 	sleep(duration);
 	
 	//sem_post(sem);
-	int * sem_val;
-	sem_getvalue(sem, sem_val);
-	printf("sem: %d\n", *sem_val);
+	//int * sem_val;
+	//sem_getvalue(sem, sem_val);
+	//printf("sem: %d\n", *sem_val);
 	printf("before sem_wait in parque\n");
 	sem_wait(sem);
 	printf("after sem_wait in parque\n");
 	
-	Viatura * vehicle_stop = (Viatura*)malloc(sizeof(Viatura));
-	vehicle_stop->id= -1;
+	Viatura vehicle_stop;// = (Viatura*)malloc(sizeof(Viatura));
+	vehicle_stop.id= -1;
+	vehicle_stop.tempo = 1;
+	vehicle_stop.direccao = 'N';
 	
 	write(fdN, &vehicle_stop, sizeof(Viatura));
 	close(fdN);

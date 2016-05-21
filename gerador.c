@@ -12,7 +12,6 @@
 #include <fcntl.h>
 #include "structs.h"
 
-int id_viatura=0;
 sem_t * sem;
 
 void * tviatura(void * arg)
@@ -25,7 +24,7 @@ void * tviatura(void * arg)
 /*	if(mkfifo(private_fifo,0660)!=0)
 	{
 		perror(private_fifo);
-		free(v);
+		//free(&v);
 		exit(2);
 	}*/
 	mkfifo(private_fifo, 0600);
@@ -35,7 +34,7 @@ void * tviatura(void * arg)
 	{
 		perror("WRITER failure in sem_open()");
 		//unlink(private_fifo);
-	    //free(v);
+	    //free(&v);
 	    exit(3);
 	}
 	
@@ -60,7 +59,7 @@ void * tviatura(void * arg)
 	    		 unlink(private_fifo);
 	    		 close(write_to_fifo);
 	    		 sem_post(sem);
-	    		 free(v);
+	    		 //free(&v);
 	    		 return NULL;
 	    	 }
 	    	 break;
@@ -73,7 +72,7 @@ void * tviatura(void * arg)
 				 unlink(private_fifo);
 				 close(write_to_fifo);
 				 sem_post(sem);
-				 free(v);
+				 //free(&v);
 				 return NULL;
 			 }
 	         break;
@@ -86,7 +85,7 @@ void * tviatura(void * arg)
 				 unlink(private_fifo);
 				 close(write_to_fifo);
 				 sem_post(sem);
-				 free(v);
+				 //free(&v);
 				 return NULL;
 			 }
 	         break;
@@ -99,7 +98,7 @@ void * tviatura(void * arg)
 				 unlink(private_fifo);
 				 close(write_to_fifo);
 				 sem_post(sem);
-				 free(v);
+				 //free(&v);
 				 return NULL;
 			 }
 	         break;
@@ -108,7 +107,7 @@ void * tviatura(void * arg)
 	if( write( write_to_fifo, v, sizeof(Viatura) ) == -1 )
 	{
 		printf("WRITE ERRO\n");
-	    free(v);
+	    //free(&v);
 	    unlink(private_fifo);
 	    close(write_to_fifo);
 	    sem_post(sem);
@@ -123,22 +122,22 @@ void * tviatura(void * arg)
 	if((read_from_fifo=open(private_fifo,O_RDONLY))==-1)
 	{
 		perror(private_fifo);
-		free(v);
+		//free(&v);
 		unlink(private_fifo);
 		close(read_from_fifo);
 		exit(4);
 	}printf("gggggggggg\n");
 	//ler do fifo
-	char info_from_park;
+	int info_from_park;
 	if(read(read_from_fifo,&info_from_park,sizeof(char))==-1)
 	{
 		printf("READ ERRO\n");
-		free(v);
+		//free(&v);
 		unlink(private_fifo);
 		close(read_from_fifo);
 		exit(4);
 	}
-	printf("info: %c", info_from_park);
+	printf("info: %d\n", info_from_park);
 	if(info_from_park==SAIU_PARQUE)
 	{
 		printf("viatura saiu do parque\n");
@@ -152,7 +151,7 @@ void * tviatura(void * arg)
 		printf("parque fechou\n");
 	}
 
-	free(v);
+	//free(&v);
 	unlink(private_fifo);
 	close(read_from_fifo);
 	return NULL;
@@ -175,38 +174,40 @@ int main (int argc, char* argv[])
 		exit(2);
 	}
 	
+	int id_viatura=0;
 	double elapsedTime = 0;
 	srand(time(NULL));
 	clock_t start = clock(), curr_time;
 
 	while(elapsedTime < t_geracao)
 	{
-		Viatura* v = (Viatura*)malloc(sizeof(Viatura));
+		Viatura v;
+		//Viatura * v = (Viatura*)malloc(sizeof(Viatura));
 		
 		int random_access = rand() % 4;
 		//criar a direcção
 		if(random_access==0)
 		{
-			v->direccao='N';
+			v.direccao='N';
 		}
 		else if(random_access==1)
 		{
-			v->direccao='S';
+			v.direccao='S';
 		}
 		else if(random_access==2)
 		{
-			v->direccao='E';
+			v.direccao='E';
 		}
 		else
 		{
-			v->direccao='O';
+			v.direccao='O';
 		}
 		
 		//criar o identificador único
-		v->id=id_viatura;
-		id_viatura++;
+		v.id=id_viatura++;
+		printf("v.id: %d\n", v.id);
 		//gerar o tempo de estacionamento
-		v->tempo=(rand()%10 + 1 )* u_relogio;
+		v.tempo=(rand()%10 + 1 )* u_relogio;
 		
 		int random = rand() % 10;
 		
@@ -226,12 +227,14 @@ int main (int argc, char* argv[])
 		//criar thread para a viatura
 		pthread_t tid;
 		
-		if(pthread_create(&tid, NULL , tviatura , v))
+		if(pthread_create(&tid, NULL , tviatura , &v))
 		{
 			printf("Error Creating Thread!\n");
 		    exit(3);
 		}
 		pthread_detach(tid);
+		
+		
 		
 		curr_time = clock();
 		elapsedTime = (curr_time - start) / (double) CLOCKS_PER_SEC;
