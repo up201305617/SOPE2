@@ -14,6 +14,7 @@
 
 
 int f_places, fp;
+sem_t * sem;
 
 void * tarrumador(void * arg){
 	//arruma
@@ -162,6 +163,15 @@ int main(int argc, char ** argv){
 	//double elapsedTime = 0;
 	//clock_t start = clock(), curr_time;
 	
+	//criar semaforo
+	if((sem = sem_open("/semaphore",O_CREAT,0600,0)) == SEM_FAILED)
+	{
+		perror("WRITER failure in sem_open()");
+		//unlink(private_fifo);
+	    //free(v);
+	    exit(3);
+	}
+	
 	int fdN, fdS, fdE, fdO;
 	pthread_t tid_n, tid_s, tid_e, tid_o;
 	
@@ -183,6 +193,8 @@ int main(int argc, char ** argv){
 	
 	sleep(duration);
 	
+	sem_wait(sem);
+	
 	Viatura * vehicle_stop = (Viatura*)malloc(sizeof(Viatura));
 	vehicle_stop->id= -1;
 	
@@ -201,6 +213,10 @@ int main(int argc, char ** argv){
 	write(fdO, &vehicle_stop, sizeof(Viatura));
 	close(fdO);
 	unlink(FIFOPO);
+	
+	sem_post(sem);
+	
+	printf("Parque esta agora fechado\n");
 	
 	pthread_exit(NULL);
 }

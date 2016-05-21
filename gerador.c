@@ -12,46 +12,41 @@
 #include <fcntl.h>
 #include "structs.h"
 
-#define FIFOPN "/tmp/fifoN"
-#define FIFOPS "/tmp/fifoS"
-#define FIFOPE "/tmp/fifoE"
-#define FIFOPO "/tmp/fifoO"
-#define MAX_LENGHT 5000
-#define SAIU_PARQUE 0
-#define PARQUE_CHEIO 1
-#define PARQUE_ENCERROU 2
-#define TPS sysconf(_SC_CLK_TCK)	//ticks per second
-
 int id_viatura=0;
 sem_t * sem;
 
 void * tviatura(void * arg)
 {	
 	Viatura *v = (Viatura *) (arg);
+	printf("thread viatura %d\n", v->id);
 	//criar fifo privado de nome único - usar o id da viatura
 	char private_fifo[MAX_LENGHT];
 	sprintf(private_fifo, "/tmp/viatura%d", v->id);
-	if(mkfifo(private_fifo,0660)!=0)
+/*	if(mkfifo(private_fifo,0660)!=0)
 	{
 		perror(private_fifo);
 		free(v);
 		exit(2);
-	}
+	}*/
+	mkfifo(private_fifo, 0600);
+	
+	
 	//criar semaforo
 	if((sem = sem_open("/semaphore",O_CREAT,0600,0)) == SEM_FAILED)
 	{
 		perror("WRITER failure in sem_open()");
 		unlink(private_fifo);
 	    free(v);
-	    return NULL;;
+	    return NULL;
 	}
 	sem_wait(sem);
-	
+	printf("aaaaaaaaa\n");
 	//criar fifo escrita
 	int write_to_fifo;
+
 	switch (v->direccao)
 	{
-	     case 'N':
+	     case 'N':printf("bbbbbbbb\n");
 			write_to_fifo = open(FIFOPN, O_WRONLY);
 			
 	    	 if(write_to_fifo == -1)
@@ -64,7 +59,7 @@ void * tviatura(void * arg)
 	    		 return NULL;
 	    	 }
 	    	 break;
-		 case 'S':
+		 case 'S':printf("bbbbbbbb\n");
 			write_to_fifo = open(FIFOPS, O_WRONLY);
 			
 			 if(write_to_fifo == -1)
@@ -77,7 +72,7 @@ void * tviatura(void * arg)
 				 return NULL;
 			 }
 	         break;
-	     case 'E':
+	     case 'E':printf("bbbbbbbb\n");
 			write_to_fifo = open(FIFOPE, O_WRONLY);
 			
 	    	 if(write_to_fifo == -1)
@@ -90,7 +85,7 @@ void * tviatura(void * arg)
 				 return NULL;
 			 }
 	         break;
-	     case 'O':
+	     case 'O':printf("bbbbbbbb\n");
 			write_to_fifo = open(FIFOPO, O_WRONLY);
 			
 	    	 if(write_to_fifo == -1)
@@ -103,7 +98,7 @@ void * tviatura(void * arg)
 				 return NULL;
 			 }
 	         break;
-	}
+	}printf("ccccccccc\n");
 	//escrever para o fifo
 	if( write( write_to_fifo, v, sizeof(Viatura) ) == -1 )
 	{
@@ -116,6 +111,8 @@ void * tviatura(void * arg)
 	}
 	close(write_to_fifo);
 	sem_post(sem);
+	
+	
 	//abrir fifo de leitura
 	int read_from_fifo;
 	if((read_from_fifo=open(private_fifo,O_RDONLY))==-1)
@@ -233,7 +230,7 @@ int main (int argc, char* argv[])
 		
 		curr_time = clock();
 		elapsedTime = (curr_time - start) / (double) CLOCKS_PER_SEC;
-		printf("time:%f\n", elapsedTime);	//time keeping doesn't seem to be correct
+		printf("time:%f\n", elapsedTime);
 	}
 	
 	pthread_exit(NULL);
