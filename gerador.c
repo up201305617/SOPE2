@@ -16,6 +16,7 @@ sem_t * sem;
 
 void * tviatura(void * arg)
 {	
+	clock_t initial = times(NULL);	
 	Viatura *v = (Viatura *) (arg);
 	printf("thread viatura %d\n", v->id);
 	char private_fifo[MAX_LENGHT];
@@ -24,8 +25,7 @@ void * tviatura(void * arg)
 	{
 		printf("ERROR FIFO\n");
 	}
-	
-	//criar semaforo
+FILE * gerador_log = fopen(LOG_GERADOR,"a");
 	if((sem = sem_open("/semaphore", 0)) == SEM_FAILED)
 	{
 		perror("WRITER failure in sem_open()");
@@ -88,10 +88,13 @@ void * tviatura(void * arg)
 	if(info_from_park==SAIU_PARQUE)
 	{
 		printf("viatura saiu do parque\n");
+		fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      %d ; saída!\n",1,v->id,v->direccao,v->tempo,(int)(times(NULL)-initial));
+		
 	}
 	if(info_from_park==PARQUE_CHEIO)
 	{
 		printf("parque cheio\n");
+		fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; cheio!\n",1,v->id,v->direccao,v->tempo);
 		
 	}
 	if(info_from_park==PARQUE_ENCERROU)
@@ -101,6 +104,7 @@ void * tviatura(void * arg)
 	if(info_from_park==ENTROU_PARQUE)
 	{
 		printf("viatura entrou parque\n");
+		fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; entrou\n",1,v->id,v->direccao,v->tempo);
 	}
 	free(v);
 	unlink(private_fifo);
@@ -126,7 +130,7 @@ int main (int argc, char* argv[])
 	}
 
 	FILE * gerador_log = fopen(LOG_GERADOR,"w");
-	fprintf(gerador_log, "t(ticks); id_viatura\n");
+	fprintf(gerador_log, "t(ticks) ; id_viat ; destin ; t_estacion ; t_vida ; observ\n");
 	fclose(gerador_log);
 	
 	int id_viatura=0;
