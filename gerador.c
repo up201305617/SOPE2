@@ -18,16 +18,12 @@ void * tviatura(void * arg)
 {	
 	Viatura *v = (Viatura *) (arg);
 	printf("thread viatura %d\n", v->id);
-	//criar fifo privado de nome único - usar o id da viatura
 	char private_fifo[MAX_LENGHT];
 	sprintf(private_fifo, "/tmp/viatura%d", v->id);
-/*	if(mkfifo(private_fifo,0660)!=0)
+	if(mkfifo(private_fifo,S_IRWXU)!=0)
 	{
-		perror(private_fifo);
-		//free(&v);
-		exit(2);
-	}*/
-	mkfifo(private_fifo, 0600);
+		printf("ERROR FIFO\n");
+	}
 	
 	//criar semaforo
 	if((sem = sem_open("/semaphore", 0)) == SEM_FAILED)
@@ -38,71 +34,22 @@ void * tviatura(void * arg)
 	    exit(3);
 	}
 	
-	//int * sem_val;
-	printf("00000000\n");
-	//sem_getvalue(sem, sem_val);printf("11111111\n");
-	//printf("sem: %d\n", *sem_val);
-	printf("before sem_wait in gerador\n");
 	sem_wait(sem);
-	printf("after sem_wait in gerador\n");
 	//criar fifo escrita
 	int write_to_fifo;
 
-	switch (v->direccao)
+	char write_fifo[MAX_LENGHT];
+	sprintf(write_fifo,"/tmp/fifo%c",v->direccao);
+	printf("Direcção: %s\n",write_fifo);
+	if((write_to_fifo=open(write_fifo,O_WRONLY|O_NONBLOCK))<1)
 	{
-	     case 'N':printf("bbbbbbbb\n");
-			write_to_fifo = open(FIFOPN, O_WRONLY);printf("bbbbbaaaaa\n");
-			
-	    	 if(write_to_fifo == -1)
-	    	 {printf("ccccccccc\n");
-	    		 perror(private_fifo);
-	    		 unlink(private_fifo);
-	    		 close(write_to_fifo);
-	    		 sem_post(sem);
-	    		 //free(&v);
-	    		 return NULL;
-	    	 }
-	    	 break;
-		 case 'S':printf("bbbbbbbb\n");
-			write_to_fifo = open(FIFOPS, O_WRONLY);printf("bbbbbaaaaa\n");
-			
-			 if(write_to_fifo == -1)
-			 {printf("ccccccccc\n");
-				 perror(private_fifo);
-				 unlink(private_fifo);
-				 close(write_to_fifo);
-				 sem_post(sem);
-				 //free(&v);
-				 return NULL;
-			 }
-	         break;
-	     case 'E':printf("bbbbbbbb\n");
-			write_to_fifo = open(FIFOPE, O_WRONLY);printf("bbbbbaaaaa\n");
-			
-	    	 if(write_to_fifo == -1)
-			 {printf("ccccccccc\n");
-				 perror(private_fifo);
-				 unlink(private_fifo);
-				 close(write_to_fifo);
-				 sem_post(sem);
-				 //free(&v);
-				 return NULL;
-			 }
-	         break;
-	     case 'O':printf("bbbbbbbb\n");
-			write_to_fifo = open(FIFOPO, O_WRONLY);printf("bbbbbaaaaa\n");
-			
-	    	 if(write_to_fifo == -1)
-			 {printf("ccccccccc\n");
-				 perror(private_fifo);
-				 unlink(private_fifo);
-				 close(write_to_fifo);
-				 sem_post(sem);
-				 //free(&v);
-				 return NULL;
-			 }
-	         break;
-	}printf("dddddddd\n");
+		printf("ERROR OPEN\n");
+		unlink(private_fifo);
+		close(write_to_fifo);
+	    	sem_post(sem);
+	    	exit(3);
+	}
+		
 	//escrever para o fifo
 	if( write( write_to_fifo, v, sizeof(Viatura) ) == -1 )
 	{
@@ -112,11 +59,11 @@ void * tviatura(void * arg)
 	    close(write_to_fifo);
 	    sem_post(sem);
 	    exit(3);
-	}printf("eeeeeeee\n");
+	}
 	close(write_to_fifo);
 	sem_post(sem);
+	sem_close(sem);
 	
-	printf("fffffffff\n");
 	//abrir fifo de leitura
 	int read_from_fifo;
 	if((read_from_fifo=open(private_fifo,O_RDONLY))==-1)
@@ -126,12 +73,12 @@ void * tviatura(void * arg)
 		unlink(private_fifo);
 		close(read_from_fifo);
 		exit(4);
-	}printf("gggggggggg\n");
+	}
 	//ler do fifo
-	int info_from_park;
+	char info_from_park;
 	if(read(read_from_fifo,&info_from_park,sizeof(char))==-1)
 	{
-		printf("READ ERRO\n");
+		printf("ERROR. READ FROM FIFO\n");
 		//free(&v);
 		unlink(private_fifo);
 		close(read_from_fifo);
@@ -145,13 +92,17 @@ void * tviatura(void * arg)
 	if(info_from_park==PARQUE_CHEIO)
 	{
 		printf("parque cheio\n");
+		
 	}
 	if(info_from_park==PARQUE_ENCERROU)
 	{
 		printf("parque fechou\n");
 	}
-
-	//free(&v);
+	if(info_from_park==ENTROU_PARQUE)
+	{
+		printf("viatura entrou parque\n");
+	}
+	free(v);
 	unlink(private_fifo);
 	close(read_from_fifo);
 	return NULL;
@@ -173,6 +124,10 @@ int main (int argc, char* argv[])
 		fprintf(stderr, "Illegal arguments");
 		exit(2);
 	}
+
+	FILE * gerador_log = fopen(LOG_GERADOR,"w");
+	fprintf(gerador_log, "t(ticks); id_viatura\n");
+	fclose(gerador_log);
 	
 	int id_viatura=0;
 	double elapsedTime = 0;
@@ -181,33 +136,32 @@ int main (int argc, char* argv[])
 
 	while(elapsedTime < t_geracao)
 	{
-		Viatura v;
-		//Viatura * v = (Viatura*)malloc(sizeof(Viatura));
+		//Viatura v;
+		Viatura * v = (Viatura*)malloc(sizeof(Viatura));
 		
 		int random_access = rand() % 4;
 		//criar a direcção
 		if(random_access==0)
 		{
-			v.direccao='N';
+			v->direccao='N';
 		}
 		else if(random_access==1)
 		{
-			v.direccao='S';
+			v->direccao='S';
 		}
 		else if(random_access==2)
 		{
-			v.direccao='E';
+			v->direccao='E';
 		}
 		else
 		{
-			v.direccao='O';
+			v->direccao='O';
 		}
 		
 		//criar o identificador único
-		v.id=id_viatura++;
-		printf("v.id: %d\n", v.id);
+		v->id=id_viatura++;
 		//gerar o tempo de estacionamento
-		v.tempo=(rand()%10 + 1 )* u_relogio;
+		v->tempo=(rand()%10 + 1 )* u_relogio;
 		
 		int random = rand() % 10;
 		
@@ -227,9 +181,9 @@ int main (int argc, char* argv[])
 		//criar thread para a viatura
 		pthread_t tid;
 		
-		if(pthread_create(&tid, NULL , tviatura , &v))
+		if(pthread_create(&tid, NULL , tviatura , v))
 		{
-			printf("Error Creating Thread!\n");
+		    printf("Error Creating Thread!\n");
 		    exit(3);
 		}
 		pthread_detach(tid);

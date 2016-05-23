@@ -17,6 +17,8 @@
 #define CONTR_E_ID	2
 #define CONTR_O_ID	3
 
+#define LOG_GERADOR "gerador.log"
+
 typedef struct
 {
 	char direccao; //accesso do parque para onde se vai dirigir

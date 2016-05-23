@@ -185,19 +185,19 @@ int main(int argc, char ** argv){
 	pthread_t tid_n, tid_s, tid_e, tid_o;
 	
 	mkfifo(FIFOPN, 0600);
-	pthread_create(&tid_n, NULL, tcontroller, FIFOPN);
+	pthread_create(&tid_n, NULL, tcontroller, &FIFOPN);
 	fdN = open(FIFOPN, O_WRONLY);
 	
 	mkfifo(FIFOPS, 0600);
-	pthread_create(&tid_s, NULL, tcontroller, FIFOPS);
+	pthread_create(&tid_s, NULL, tcontroller, &FIFOPS);
 	fdS = open(FIFOPS, O_WRONLY);
 	
 	mkfifo(FIFOPE, 0600);
-	pthread_create(&tid_e, NULL, tcontroller, FIFOPE);
+	pthread_create(&tid_e, NULL, tcontroller, &FIFOPE);
 	fdE = open(FIFOPE, O_WRONLY);
 	
 	mkfifo(FIFOPO, 0600);
-	pthread_create(&tid_o, NULL, tcontroller, FIFOPO);
+	pthread_create(&tid_o, NULL, tcontroller, &FIFOPO);
 	fdO = open(FIFOPO, O_WRONLY);
 	
 	printf("sleeping\n");
