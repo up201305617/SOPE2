@@ -10,6 +10,7 @@
 #include <limits.h>
 #include <semaphore.h>
 #include <fcntl.h>
+#include <signal.h>
 #include "structs.h"
 
 
@@ -24,9 +25,9 @@ void * tarrumador(void * arg){
 	printf("000000000\n");
 	char private_fifo[MAX_LENGHT];
 	sprintf(private_fifo, "/tmp/viatura%d", vehicle.id);
-
+	signal(SIGPIPE, SIG_IGN);
 	if((fd = open(private_fifo, O_WRONLY)) == -1){
-		perror(private_fifo);
+		printf("error on open %s\n", strerror(errno));
 		//free(&vehicle);
 		unlink(private_fifo);
 		close(fd);
@@ -36,25 +37,25 @@ void * tarrumador(void * arg){
 	if (fp <= 0){//free places
 		printf("22222222222222\n");
 		info = PARQUE_CHEIO;
-		if (write(fd, &info, sizeof(char) ) == -1 ){
-			perror(private_fifo);
+		if (write(fd, &info, sizeof(int) ) == -1 ){
+			printf("error on write %s\n", strerror(errno));
 			//free(&vehicle);
 			unlink(private_fifo);
 			close(fd);
 			//sem_post(sem);
-			exit(3);
+			exit(5);
 		}
 	}
 	else {
 		printf("33333333333333\n");
 		info = ENTROU_PARQUE;
-		if (write(fd, &info, sizeof(char) ) == -1 ){
+		if (write(fd, &info, sizeof(int) ) == -1 ){
 			perror(private_fifo);
 			//free(&vehicle);
 			unlink(private_fifo);
 			close(fd);
 			//sem_post(sem);
-			exit(3);
+			exit(6);
 		}	
 		printf("34343434343434\n");
 		fp--;
@@ -62,13 +63,13 @@ void * tarrumador(void * arg){
 		mysleep(vehicle.tempo);
 		printf("353535353535335\n");
 		info = SAIU_PARQUE;
-		if (write(fd, &info, sizeof(char) ) == -1 ){
+		if (write(fd, &info, sizeof(int) ) == -1 ){
 			perror(private_fifo);
 			//free(&vehicle);
 			unlink(private_fifo);
 			close(fd);
 			//sem_post(sem);
-			exit(3);
+			exit(7);
 		}
 		printf("363636363636\n");
 		fp++;
@@ -94,12 +95,8 @@ void * tcontroller(void * arg){
 	
 	while (read(fd, &vehicle, sizeof(Viatura)) != 0){//a partir daqui recebe comunicações dos geradores. se receber do portao é só para dizer que fechou
 		printf("ccccccccc\n");
-		if (vehicle.id == -1){
-			printf("bbbbdddddddddddd\n");
-			closed = 1;
-			printf("ddddddddd\n");
-		}
-		else if (closed){
+		
+		if (closed){
 			//enviar para trás "fechado"
 			printf("bbbbeeeeeeeeeee\n");
 			int fd_gerador;
@@ -126,6 +123,11 @@ void * tcontroller(void * arg){
 			}
 			printf("veiculo %d tentou entrar, parque cheio\n", vehicle.id);
 			
+		}
+		else if (vehicle.id == -1){
+			printf("bbbbdddddddddddd\n");
+			closed = 1;
+			printf("ddddddddd\n");
 		}
 		else {
 			//criar thread arrumador e passar2016 vehicle

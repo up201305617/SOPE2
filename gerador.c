@@ -16,99 +16,118 @@ sem_t * sem;
 
 void * tviatura(void * arg)
 {	
-	clock_t initial = times(NULL);	
-	Viatura *v = (Viatura *) (arg);
-	printf("thread viatura %d\n", v->id);
-	char private_fifo[MAX_LENGHT];
+	Viatura *v = (Viatura *) (arg);	
+	
+	//Variáveis	
+	char private_fifo[MAX_LENGHT];	
+	char write_fifo[MAX_LENGHT];	
+	
+	//Inicialização 
 	sprintf(private_fifo, "/tmp/viatura%d", v->id);
+	sprintf(write_fifo,"/tmp/fifo%c",v->direccao);
+
+	//Criar FIFO para a viatura
+	unlink(private_fifo);
 	if(mkfifo(private_fifo,S_IRWXU)!=0)
 	{
-		printf("ERROR FIFO\n");
+		perror(private_fifo);
+		free(v);
+		exit(1);
 	}
-FILE * gerador_log = fopen(LOG_GERADOR,"a");
-	if((sem = sem_open("/semaphore", 0)) == SEM_FAILED)
+	//Abrir gerador.log
+	FILE * gerador_log = fopen(LOG_GERADOR,"a");
+	if(gerador_log==NULL)
 	{
-		perror("WRITER failure in sem_open()");
-		//unlink(private_fifo);
-	    //free(&v);
-	    exit(3);
+		printf("Error open gerador.log!\n");
+		exit(2);
 	}
-	
-	sem_wait(sem);
-	//criar fifo escrita
-	int write_to_fifo;
-
-	char write_fifo[MAX_LENGHT];
-	sprintf(write_fifo,"/tmp/fifo%c",v->direccao);
-	printf("Direcção: %s\n",write_fifo);
-	if((write_to_fifo=open(write_fifo,O_WRONLY|O_NONBLOCK))<1)
+	//Abrir semáforo
+if((sem = sem_open("/semaphore", 0/*0,S_IRWXU,0)*/)) == SEM_FAILED)
 	{
-		printf("ERROR OPEN\n");
+		printf("Error in sem_open()\n");
 		unlink(private_fifo);
-		close(write_to_fifo);
-	    	sem_post(sem);
+	   	free(v);
 	    	exit(3);
 	}
-		
-	//escrever para o fifo
+	//Fazer sem_wait
+	sem_wait(sem);
+	//Abrir FIFO para escrita
+	int write_to_fifo=0;
+	if((write_to_fifo=open(write_fifo,O_WRONLY | O_NONBLOCK))<1)
+	{
+		printf("error on open %s\n", strerror(errno));
+		unlink(write_fifo);
+		close(write_to_fifo);
+	    sem_post(sem);
+		free(v);
+	    exit(4);
+	}		
+	//Escrever para o FIFO
 	if( write( write_to_fifo, v, sizeof(Viatura) ) == -1 )
 	{
-		printf("WRITE ERRO\n");
-	    //free(&v);
+	    printf("Error writing to FIFO\n");
+	    free(v);
 	    unlink(private_fifo);
 	    close(write_to_fifo);
 	    sem_post(sem);
-	    exit(3);
+	    exit(5);
 	}
+	//Fechar FIFO de escrita
 	close(write_to_fifo);
 	sem_post(sem);
-	sem_close(sem);
-	
-	//abrir fifo de leitura
+	//Abrir FIFO de leitura
 	int read_from_fifo;
 	if((read_from_fifo=open(private_fifo,O_RDONLY))==-1)
 	{
 		perror(private_fifo);
-		//free(&v);
+		free(v);
 		unlink(private_fifo);
 		close(read_from_fifo);
-		exit(4);
+		exit(6);
 	}
-	//ler do fifo
-	char info_from_park;
-	if(read(read_from_fifo,&info_from_park,sizeof(char))==-1)
+	//Ler do FIFO
+	int info_from_park;
+	/*if(read(read_from_fifo,&info_from_park,sizeof(int))==-1)
 	{
-		printf("ERROR. READ FROM FIFO\n");
-		//free(&v);
+		printf("Error readind from FIFO\n");
+		free(v);
 		unlink(private_fifo);
 		close(read_from_fifo);
-		exit(4);
-	}
-	printf("info: %d\n", info_from_park);
-	if(info_from_park==SAIU_PARQUE)
-	{
-		printf("viatura saiu do parque\n");
-		fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      %d ; saída!\n",1,v->id,v->direccao,v->tempo,(int)(times(NULL)-initial));
+		exit(7);
+	}*/
+	
+	while (read(read_from_fifo, &info_from_park, sizeof(int)) != 0){
+		
+		//Processar informação vinda do FIFO
+		if(info_from_park==SAIU_PARQUE)
+		{
+			printf("viatura saiu do parque\n");
+			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      %d ; saída!\n",1,v->id,v->direccao,v->tempo,0);
+
+		}
+		if(info_from_park==PARQUE_CHEIO)
+		{
+			printf("parque cheio\n");
+			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; cheio!\n",1,v->id,v->direccao,v->tempo);
+
+		}
+		if(info_from_park==PARQUE_ENCERROU)
+		{
+			printf("parque fechou\n");
+		}
+		if(info_from_park==ENTROU_PARQUE)
+		{
+			printf("viatura entrou parque\n");
+			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; entrou\n",1,v->id,v->direccao,v->tempo);
+		}
 		
 	}
-	if(info_from_park==PARQUE_CHEIO)
-	{
-		printf("parque cheio\n");
-		fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; cheio!\n",1,v->id,v->direccao,v->tempo);
-		
-	}
-	if(info_from_park==PARQUE_ENCERROU)
-	{
-		printf("parque fechou\n");
-	}
-	if(info_from_park==ENTROU_PARQUE)
-	{
-		printf("viatura entrou parque\n");
-		fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; entrou\n",1,v->id,v->direccao,v->tempo);
-	}
+
 	free(v);
 	unlink(private_fifo);
 	close(read_from_fifo);
+	
+	
 	return NULL;
 }
 
@@ -117,7 +136,7 @@ int main (int argc, char* argv[])
 	if(argc != 3)
 	{
 		fprintf(stderr, "Usage: %s <T_GERACAO> <U_RELOGIO>\n", argv[0]);
-		exit(1);
+		exit(7);
 	}
 
 	double t_geracao = (double) atoi(argv[1]);
@@ -126,7 +145,7 @@ int main (int argc, char* argv[])
 	if(t_geracao <= 0 || u_relogio <= 0)
 	{
 		fprintf(stderr, "Illegal arguments");
-		exit(2);
+		exit(8);
 	}
 
 	FILE * gerador_log = fopen(LOG_GERADOR,"w");
@@ -188,7 +207,7 @@ int main (int argc, char* argv[])
 		if(pthread_create(&tid, NULL , tviatura , v))
 		{
 		    printf("Error Creating Thread!\n");
-		    exit(3);
+		    exit(9);
 		}
 		pthread_detach(tid);
 		
@@ -196,7 +215,7 @@ int main (int argc, char* argv[])
 		
 		curr_time = clock();
 		elapsedTime = (curr_time - start) / (double) CLOCKS_PER_SEC;
-		printf("time:%f\n", elapsedTime);
+		//printf("time:%f\n", elapsedTime);
 	}
 	
 	pthread_exit(NULL);
