@@ -13,9 +13,12 @@
 #include "structs.h"
 
 sem_t * sem;
+clock_t main_thread;
 
 void * tviatura(void * arg)
 {	
+	clock_t inicial=times(NULL);	
+		
 	Viatura *v = (Viatura *) (arg);	
 	
 	//Variáveis	
@@ -102,13 +105,13 @@ if((sem = sem_open("/semaphore", 0/*0,S_IRWXU,0)*/)) == SEM_FAILED)
 		if(info_from_park==SAIU_PARQUE)
 		{
 			printf("viatura saiu do parque\n");
-			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      %d ; saída!\n",1,v->id,v->direccao,v->tempo,0);
+			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ; %6d ; saída!\n",(int)(times(NULL)-main_thread),v->id,v->direccao,v->tempo,(int)(times(NULL)-inicial));
 
 		}
 		if(info_from_park==PARQUE_CHEIO)
 		{
 			printf("parque cheio\n");
-			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; cheio!\n",1,v->id,v->direccao,v->tempo);
+			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; cheio!\n",(int)(times(NULL)-main_thread),v->id,v->direccao,v->tempo);
 
 		}
 		if(info_from_park==PARQUE_ENCERROU)
@@ -118,7 +121,7 @@ if((sem = sem_open("/semaphore", 0/*0,S_IRWXU,0)*/)) == SEM_FAILED)
 		if(info_from_park==ENTROU_PARQUE)
 		{
 			printf("viatura entrou parque\n");
-			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; entrou\n",1,v->id,v->direccao,v->tempo);
+			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; entrou\n",(int)(times(NULL)-main_thread),v->id,v->direccao,v->tempo);
 		}
 		
 	}
@@ -151,7 +154,7 @@ int main (int argc, char* argv[])
 	FILE * gerador_log = fopen(LOG_GERADOR,"w");
 	fprintf(gerador_log, "t(ticks) ; id_viat ; destin ; t_estacion ; t_vida ; observ\n");
 	fclose(gerador_log);
-	
+	main_thread = times(NULL);
 	int id_viatura=0;
 	double elapsedTime = 0;
 	srand(time(NULL));
