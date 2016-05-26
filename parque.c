@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/times.h>
 #include <limits.h>
 #include <semaphore.h>
 #include <fcntl.h>
@@ -16,13 +17,25 @@
 
 int f_places, fp;
 sem_t * sem;
+clock_t main_thread;
 
 void * tarrumador(void * arg){
 	//arruma
+	
+	clock_t inicial=times(NULL);
+	
 	Viatura vehicle = *(Viatura *) (arg);
 	int fd;
 	int info;
-	printf("000000000\n");
+	
+	//Abrir parque.log
+	FILE * parque_log = fopen(LOG_PARQUE,"a");
+	if(parque_log==NULL)
+	{
+		printf("Error open parque.log!\n");
+		exit(2);
+	}
+
 	char private_fifo[MAX_LENGHT];
 	sprintf(private_fifo, "/tmp/viatura%d", vehicle.id);
 	signal(SIGPIPE, SIG_IGN);
@@ -31,50 +44,54 @@ void * tarrumador(void * arg){
 		//free(&vehicle);
 		unlink(private_fifo);
 		close(fd);
-		exit(4);
-	}printf("111111111111\n");
+		exit(1);
+	}
 	
 	if (fp <= 0){//free places
-		printf("22222222222222\n");
+
 		info = PARQUE_CHEIO;
+		fprintf(parque_log,"%8d ; %5d ; %7d ; cheio\n",(int)(times(NULL)-main_thread), f_places-fp ,vehicle.id);
+		
 		if (write(fd, &info, sizeof(int) ) == -1 ){
 			printf("error on write %s\n", strerror(errno));
 			//free(&vehicle);
 			unlink(private_fifo);
 			close(fd);
 			//sem_post(sem);
-			exit(5);
+			exit(2);
 		}
 	}
 	else {
-		printf("33333333333333\n");
+
 		info = ENTROU_PARQUE;
+		fprintf(parque_log,"%8d ; %5d ; %7d ; estacionamento\n",(int)(times(NULL)-main_thread), f_places-fp ,vehicle.id);
 		if (write(fd, &info, sizeof(int) ) == -1 ){
 			perror(private_fifo);
 			//free(&vehicle);
 			unlink(private_fifo);
 			close(fd);
 			//sem_post(sem);
-			exit(6);
+			exit(3);
 		}	
-		printf("34343434343434\n");
+
 		fp--;
-		printf("vehicle.tempo = %d\n", vehicle.tempo);
+
 		mysleep(vehicle.tempo);
-		printf("353535353535335\n");
+
 		info = SAIU_PARQUE;
+		fprintf(parque_log,"%8d ; %5d ; %7d ; saída\n",(int)(times(NULL)-main_thread), f_places-fp ,vehicle.id);
+		signal(SIGPIPE, SIG_IGN);
 		if (write(fd, &info, sizeof(int) ) == -1 ){
 			perror(private_fifo);
 			//free(&vehicle);
-			unlink(private_fifo);
+			//unlink(private_fifo);
 			close(fd);
 			//sem_post(sem);
-			exit(7);
+			exit(4);
 		}
-		printf("363636363636\n");
 		fp++;
 	}
-	printf("4444444444444\n");
+
 	return NULL;
 }
 
@@ -82,35 +99,42 @@ void * tcontroller(void * arg){
 	char * fifo_portao = (char *) arg;
 	int fd, closed = 0;
 	Viatura vehicle;// = (Viatura*)malloc(sizeof(Viatura));
-	char info;
-	printf("aaaaaaaa\n");
+	int info;
+	
+	//Abrir parque.log
+	FILE * parque_log = fopen(LOG_PARQUE,"a");
+	if(parque_log==NULL)
+	{
+		printf("Error open parque.log!\n");
+		exit(2);
+	}
+
 	if((fd = open(fifo_portao, O_RDONLY))==-1)
 	{
 		perror(fifo_portao);
 		//free(&v);
 		unlink(fifo_portao);
 		close(fd);
-		exit(4);
-	}printf("bbbbbbbb\n");
+		exit(5);
+	}
 	
 	while (read(fd, &vehicle, sizeof(Viatura)) != 0){//a partir daqui recebe comunicações dos geradores. se receber do portao é só para dizer que fechou
-		printf("ccccccccc\n");
 		
 		if (closed){
 			//enviar para trás "fechado"
-			printf("bbbbeeeeeeeeeee\n");
 			int fd_gerador;
-			printf("eeeeeeeee\n");
 			char private_fifo[MAX_LENGHT];
 			sprintf(private_fifo, "/tmp/viatura%d", vehicle.id);
+			
+			fprintf(parque_log,"%8d ; %5d ; %7d ; encerrado\n",(int)(times(NULL)-main_thread), f_places-fp ,vehicle.id);
 			
 			if((fd_gerador = open(private_fifo, O_WRONLY)) == -1){
 				perror(private_fifo);
 				//free(&vehicle);
 				unlink(private_fifo);
 				close(fd_gerador);
-				exit(4);
-			}printf("fffffffff\n");
+				exit(6);
+			}
 			
 			info = PARQUE_ENCERROU;
 			if (write(fd_gerador, &info, sizeof(char) ) == -1 ){
@@ -119,31 +143,27 @@ void * tcontroller(void * arg){
 				unlink(private_fifo);
 				close(fd_gerador);
 				//sem_post(sem);
-				exit(3);
+				exit(7);
 			}
-			printf("veiculo %d tentou entrar, parque cheio\n", vehicle.id);
+			
+			break;
 			
 		}
 		else if (vehicle.id == -1){
-			printf("bbbbdddddddddddd\n");
 			closed = 1;
-			printf("ddddddddd\n");
 		}
 		else {
 			//criar thread arrumador e passar2016 vehicle
-			printf("gggggggggg\n");
 			pthread_t tid;
 			
 			if(pthread_create(&tid, NULL , tarrumador , &vehicle)){
 				printf("Error Creating Thread!\n");
-				exit(3);
+				exit(8);
 			}
-			printf("veiculo %d agora ao cargo do thread arrumador\n", vehicle.id);
 			pthread_detach(tid);
 		}
-		printf("hhhhhhhhh\n");
 		//unlink(private_fifo);
-	}printf("yyyyyyyyy\n");
+	}
 	//unlink(fd_gerador);
 	close(fd);
 	unlink(fifo_portao);
@@ -157,7 +177,7 @@ int main(int argc, char ** argv){
 	if(argc != 3)
 	{
 		fprintf(stderr, "Usage: %s <N_LUGARES> <T_ABERTURA>\n", argv[0]);
-		exit(1);
+		exit(9);
 	}
 	
 	f_places = atoi(argv[1]);
@@ -167,9 +187,12 @@ int main(int argc, char ** argv){
 	if(f_places <= 0 || duration <= 0)
 	{
 		fprintf(stderr, "Illegal arguments");
-		exit(2);
+		exit(10);
 	}
 	
+	FILE * parque_log = fopen(LOG_PARQUE,"w");
+	fprintf(parque_log, "t(ticks) ; n_lug ; id_viat ; observ\n");
+	main_thread = times(NULL);
 	//double elapsedTime = 0;
 	//clock_t start = clock(), curr_time;
 	
@@ -180,8 +203,8 @@ int main(int argc, char ** argv){
 		perror("WRITER failure in sem_open()");
 		//unlink(private_fifo);
 	    //free(&v);
-	    exit(3);
-	}printf("000000\n");
+	    exit(11);
+	}
 	
 	int fdN, fdS, fdE, fdO;
 	pthread_t tid_n, tid_s, tid_e, tid_o;
@@ -202,16 +225,10 @@ int main(int argc, char ** argv){
 	pthread_create(&tid_o, NULL, tcontroller, &FIFOPO);
 	fdO = open(FIFOPO, O_WRONLY);
 	
-	printf("sleeping\n");
+	printf("Park open for %d seconds\n", duration);
 	sleep(duration);
 	
-	//sem_post(sem);
-	//int * sem_val;
-	//sem_getvalue(sem, sem_val);
-	//printf("sem: %d\n", *sem_val);
-	printf("before sem_wait in parque\n");
 	sem_wait(sem);
-	printf("after sem_wait in parque\n");
 	
 	Viatura vehicle_stop;// = (Viatura*)malloc(sizeof(Viatura));
 	vehicle_stop.id= -1;

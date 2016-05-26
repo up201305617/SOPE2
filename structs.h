@@ -18,6 +18,7 @@
 #define CONTR_O_ID	3
 
 #define LOG_GERADOR "gerador.log"
+#define LOG_PARQUE	"parque.log"
 
 typedef struct
 {

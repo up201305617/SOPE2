@@ -7,9 +7,11 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/times.h>
 #include <limits.h>
 #include <semaphore.h>
 #include <fcntl.h>
+#include <signal.h>
 #include "structs.h"
 
 sem_t * sem;
@@ -56,9 +58,10 @@ if((sem = sem_open("/semaphore", 0/*0,S_IRWXU,0)*/)) == SEM_FAILED)
 	sem_wait(sem);
 	//Abrir FIFO para escrita
 	int write_to_fifo=0;
+	signal(SIGPIPE, SIG_IGN);
 	if((write_to_fifo=open(write_fifo,O_WRONLY | O_NONBLOCK))<1)
 	{
-		printf("error on open %s\n", strerror(errno));
+		printf("Error on Open: %s\n", strerror(errno));
 		unlink(write_fifo);
 		close(write_to_fifo);
 	    sem_post(sem);
@@ -92,35 +95,40 @@ if((sem = sem_open("/semaphore", 0/*0,S_IRWXU,0)*/)) == SEM_FAILED)
 	int info_from_park;
 	/*if(read(read_from_fifo,&info_from_park,sizeof(int))==-1)
 	{
-		printf("Error readind from FIFO\n");
+		printf("Error reading from FIFO\n");
 		free(v);
 		unlink(private_fifo);
 		close(read_from_fifo);
 		exit(7);
 	}*/
-	
 	while (read(read_from_fifo, &info_from_park, sizeof(int)) != 0){
 		
 		//Processar informação vinda do FIFO
 		if(info_from_park==SAIU_PARQUE)
 		{
-			printf("viatura saiu do parque\n");
+			printf("viatura %d saiu do parque\n", v->id);
 			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ; %6d ; saída!\n",(int)(times(NULL)-main_thread),v->id,v->direccao,v->tempo,(int)(times(NULL)-inicial));
+			
+			break;
 
 		}
 		if(info_from_park==PARQUE_CHEIO)
 		{
 			printf("parque cheio\n");
 			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; cheio!\n",(int)(times(NULL)-main_thread),v->id,v->direccao,v->tempo);
+			
+			break;
 
 		}
 		if(info_from_park==PARQUE_ENCERROU)
 		{
 			printf("parque fechou\n");
+			
+			break;
 		}
 		if(info_from_park==ENTROU_PARQUE)
 		{
-			printf("viatura entrou parque\n");
+			printf("viatura %d entrou parque\n", v->id);
 			fprintf(gerador_log,"%8d ; %7d ; %6c ; %10d ;      ? ; entrou\n",(int)(times(NULL)-main_thread),v->id,v->direccao,v->tempo);
 		}
 		
@@ -130,7 +138,6 @@ if((sem = sem_open("/semaphore", 0/*0,S_IRWXU,0)*/)) == SEM_FAILED)
 	unlink(private_fifo);
 	close(read_from_fifo);
 	
-	
 	return NULL;
 }
 
@@ -139,7 +146,7 @@ int main (int argc, char* argv[])
 	if(argc != 3)
 	{
 		fprintf(stderr, "Usage: %s <T_GERACAO> <U_RELOGIO>\n", argv[0]);
-		exit(7);
+		exit(8);
 	}
 
 	double t_geracao = (double) atoi(argv[1]);
@@ -148,7 +155,7 @@ int main (int argc, char* argv[])
 	if(t_geracao <= 0 || u_relogio <= 0)
 	{
 		fprintf(stderr, "Illegal arguments");
-		exit(8);
+		exit(9);
 	}
 
 	FILE * gerador_log = fopen(LOG_GERADOR,"w");
@@ -210,7 +217,7 @@ int main (int argc, char* argv[])
 		if(pthread_create(&tid, NULL , tviatura , v))
 		{
 		    printf("Error Creating Thread!\n");
-		    exit(9);
+		    exit(10);
 		}
 		pthread_detach(tid);
 		
